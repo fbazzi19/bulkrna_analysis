@@ -83,16 +83,11 @@ boxplot(colData(liver)$gtex.smrin)
 boxplot(colData(liver)$gtex.smrrnart)
 boxplot(colData(liver)$"recount_qc.star.uniquely_mapped_reads_%_both")
 
-#----Clean up factors causing bias----
+#----Clean up factors causing bias (OPTIONAL)----
 #function to clean up factors potentially causing bias
 filter_data <- function(rse){
-  #challenge 1a and 2: remove genes annotated on mitochondrial DNA
-  #and keep genes only on canonical chromosomes
-  canonchr <- c("chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr8",
-                "chr9", "chr10", "chr11", "chr12", "chr13", "chr14", "chr15",
-                "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22",
-                "chrX", "chrY")
-  rse<- rse[rowRanges(rse)@seqnames %in% canonchr]
+  #challenge 1a: remove genes annotated on mitochondrial DNA
+  rse<- rse[rowRanges(rse)@seqnames !="chrM"]
   
   #challenge 1b and 1c: remove pseudogenes and rRNA genes
   rse<- rse[((rowData(rse)$gbkey!="Gene" & rowData(rse)$gbkey!="rRNA") | is.na(rowData(rse)$gbkey))]
@@ -103,10 +98,19 @@ filter_data <- function(rse){
   return(rse)
 }
 
-brain <- filter_data(brain)
-blood <- filter_data(blood)
-liver <- filter_data(liver)
+canonchr <- c("chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr8",
+             "chr9", "chr10", "chr11", "chr12", "chr13", "chr14", "chr15",
+             "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22",
+             "chrX", "chrY", "chrM")
+brain_filtered<- brain[rowRanges(brain)@seqnames %in% canonchr]
+blood_filtered<- blood[rowRanges(blood)@seqnames %in% canonchr]
+liver_filtered<- liver[rowRanges(liver)@seqnames %in% canonchr]
 
+brain_filtered <- filter_data(brain)
+blood_filtered <- filter_data(blood)
+liver_filtered <- filter_data(liver)
+
+#TODO: add some details to the challenge, see forum
 
 #---- check assigned columns ----
 #This functions starts at a given column and checks if that sample meets
