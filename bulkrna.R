@@ -299,7 +299,8 @@ liver_up_genes <- intersect(liver_up_genes,
 #check the expression across all samples, not just my assigned ones
 which(rowData(brain)$gene_name == "UGT1A1") #gene found in liver cells
 boxplot(assays(brain)$TPM[20205,],assays(blood)$TPM[20205,], assays(liver)$TPM[20205,], outline=F )
-#TODO: use a statistical test to prove this expression across all samples is significant
+#use a statistical test to prove this expression across all samples is significant
 wilcox.test(assays(brain)$TPM[20205,], assays(blood)$TPM[20205,], alternative='two.sided',exact = F,correct = T)
 wilcox.test(assays(brain)$TPM[20205,], assays(liver)$TPM[20205,], alternative='two.sided',exact = F,correct = T)
 wilcox.test(assays(blood)$TPM[20205,], assays(liver)$TPM[20205,], alternative='two.sided',exact = F,correct = T)
+#TODO: adjust so that the comparison is liver vs blood + brain
