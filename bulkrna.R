@@ -4,6 +4,14 @@
 library(recount)
 library(recount3)
 library(edgeR)
+library(ggplot2)
+library(ggpubr)
+
+#----Colors----
+#color pallete to use for figure generation throughout
+colorpallete <- c("#DA9C7E", "#66B386", "#E6D939", 
+                  "#EDC2C2", "#B1C2FF", "#BCB0CE",
+                  "#EB7B70", "#B06CC8", "#626CB2")
 
 #----load in and transform counts data----
 brain <- readRDS("rse_brain.RDS")
@@ -208,9 +216,44 @@ y <- calcNormFactors(y, method = "TMM")
 #log cpm after normalization
 logcpm_after <- cpm(y, log=TRUE)
 #boxplots
-#TODO: make pretty
-boxplot(logcpm_before, notch=T)
-boxplot(logcpm_after, notch=T)
+datlcb <- stack(as.data.frame(logcpm_before)) #dataframe for ggplot
+beforeplt <- ggplot(datlcb, aes(x=ind, y=values, fill=ind)) + 
+  geom_boxplot(alpha=0.3, notch=TRUE) +
+  scale_fill_manual(values = colorpallete)+
+  ylab("Log(CPM Reads Mapped)")+
+  xlab("Sample")+
+  ggtitle("CPM Reads Mapped before Normalization")+
+  theme(legend.position="none",
+        panel.grid.major.y = element_blank(),
+        panel.border = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.background = element_rect(fill = "#F9FCF3"),
+        panel.background = element_rect(fill = "white"),
+        plot.title = element_text(hjust = 0.5, size=18))
+
+datlca <- stack(as.data.frame(logcpm_after)) #dataframe for ggplot
+afterplt <- ggplot(datlca, aes(x=ind, y=values, fill=ind)) + 
+  geom_boxplot(alpha=0.3, notch=TRUE) +
+  scale_fill_manual(values = colorpallete)+
+  ylab("Log(CPM Reads Mapped)")+
+  xlab("Sample")+
+  ggtitle("CPM Reads Mapped after Normalization")+
+  theme(legend.position="none",
+        panel.grid.major.y = element_blank(),
+        panel.border = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.background = element_rect(fill = "#F9FCF3"),
+        panel.background = element_rect(fill = "white"),
+        plot.title = element_text(hjust = 0.5, size = 18))
+
+ggarrange(beforeplt, afterplt,
+          ncol = 1, nrow = 2)
+#look at the normalization factors directly
+y$samples['norm.factors']
 
 #----Linear Model----
 design <- model.matrix(~0+group, data=y$samples)
@@ -219,17 +262,26 @@ design
 
 #visualize how samples cluster together
 logcpm <- cpm(y, log=TRUE)
-plotMDS(logcpm, labels=group)
+par(bg = "#F9FCF3", mfrow=c(1,4))
+plotMDS(logcpm, labels=group, 
+        col=c(rep(colorpallete[3],3), rep(colorpallete[4],3), rep(colorpallete[5],3)),
+        main="Tissue")
 #label the samples by rRNA
-plotMDS(logcpm, labels=y$samples$rRNA)
-#label by percent of aligned reads
-plotMDS(logcpm, labels=y$samples$chrm)
+plotMDS(logcpm, labels=y$samples$rRNA, 
+        col=c(rep(colorpallete[3],3), rep(colorpallete[4],3), rep(colorpallete[5],3)),
+        main="% rRNA")
+#label by percent of mitochondrial reads
+plotMDS(logcpm, labels=y$samples$chrm, 
+        col=c(rep(colorpallete[3],3), rep(colorpallete[4],3), rep(colorpallete[5],3)),
+        main="% Mitochondrial Genes")
 #label by age
-plotMDS(logcpm, labels=y$samples$age)
-
+plotMDS(logcpm, labels=y$samples$age, 
+        col=c(rep(colorpallete[3],3), rep(colorpallete[4],3), rep(colorpallete[5],3)),
+        main="Age")
+par(mfrow=c(1,1))
 #plot biological coefficient of variation
 y <- estimateDisp(y, design)
-plotBCV(y)
+plotBCV(y, col.common = colorpallete[9], col.trend = colorpallete[7], col.tagwise = colorpallete[6])
 
 #fit linear model
 fit <- glmQLFit(y, design)
@@ -239,6 +291,14 @@ qlfBBL <- glmQLFTest(fit, contrast=c(-1,1,0))
 qlfLBL <- glmQLFTest(fit, contrast=c(-1,0,1))
 #liver (top) vs brain (bottom)
 qlfLB <- glmQLFTest(fit, contrast=c(0,-1,1))
+
+#genes that are differentially expressed in one compared to both
+#blood vs both
+qlfBL <- glmQLFTest(fit, contrast=c(1,-0.5,-0.5))
+#liver vs both 
+qlfL <- glmQLFTest(fit, contrast=c(-0.5,-0.5,1))
+#brain vs both
+qlfB <- glmQLFTest(fit, contrast = c(-0.5,1,-0.5))
 
 qlfBBL
 
@@ -256,45 +316,9 @@ write.table(resultsLBL, "resultsLBL.txt")
 write.table(resultsLB, "resultsLB.txt")
 
 #summary of DE genes
-summary(decideTests(qlfBBL, p.value=0.05, adjust.method = "BH", lfc=0)) #can adjust p value and log fold change
-summary(decideTests(qlfLBL, p.value=0.05, adjust.method = "BH", lfc=0))
-summary(decideTests(qlfLB, p.value=0.05, adjust.method = "BH", lfc=0))
-
-#find genes that are upregulated 1v3, ie, upregulated in one compared to both
-#first find row names where it is upregulated against one 
-brain_up_idx <- which(topTags(qlfBBL, n = 10000000, adjust.method = "BH", 
-                              sort.by = "PValue", p.value = 0.01)[["table"]]$logFC>0)
-brain_up_genes <- row.names(topTags(qlfBBL, n = 10000000, adjust.method = "BH", 
-                                    sort.by = "PValue", p.value = 0.01)[["table"]][brain_up_idx,])
-#find the rows where it is upregulated against the other
-brain_up_idx <- which(topTags(qlfLB, n = 10000000, adjust.method = "BH", 
-                              sort.by = "PValue", p.value = 0.01)[["table"]]$logFC<0)
-#perform the intersection of the two
-brain_up_genes <- intersect(brain_up_genes, 
-                            row.names(topTags(qlfLB, n = 10000000, adjust.method = "BH", sort.by = "PValue", p.value = 0.01)[["table"]][brain_up_idx,]))
-
-#repeat for blood and liver
-blood_up_idx <- which(topTags(qlfBBL, n = 10000000, adjust.method = "BH", 
-                              sort.by = "PValue", p.value = 0.01)[["table"]]$logFC<0)
-blood_up_genes <- row.names(topTags(qlfBBL, n = 10000000, adjust.method = "BH", 
-                                    sort.by = "PValue", p.value = 0.01)[["table"]][blood_up_idx,])
-#find the rows where it is upregulated against the other
-blood_up_idx <- which(topTags(qlfLBL, n = 10000000, adjust.method = "BH", 
-                              sort.by = "PValue", p.value = 0.01)[["table"]]$logFC<0)
-#perform the intersection of the two
-blood_up_genes <- intersect(blood_up_genes, 
-                            row.names(topTags(qlfLBL, n = 10000000, adjust.method = "BH", sort.by = "PValue", p.value = 0.01)[["table"]][blood_up_idx,]))
-
-liver_up_idx <- which(topTags(qlfLBL, n = 10000000, adjust.method = "BH", 
-                              sort.by = "PValue", p.value = 0.01)[["table"]]$logFC>0)
-liver_up_genes <- row.names(topTags(qlfLBL, n = 10000000, adjust.method = "BH", 
-                                    sort.by = "PValue", p.value = 0.01)[["table"]][liver_up_idx,])
-#find the rows where it is upregulated against the other
-liver_up_idx <- which(topTags(qlfLB, n = 10000000, adjust.method = "BH", 
-                              sort.by = "PValue", p.value = 0.01)[["table"]]$logFC>0)
-#perform the intersection of the two
-liver_up_genes <- intersect(liver_up_genes, 
-                            row.names(topTags(qlfLB, n = 10000000, adjust.method = "BH", sort.by = "PValue", p.value = 0.01)[["table"]][liver_up_idx,]))
+summary(decideTests(qlfBBL, p.value=0.01, adjust.method = "BH", lfc=1)) #can adjust p value and log fold change
+summary(decideTests(qlfLBL, p.value=0.01, adjust.method = "BH", lfc=1))
+summary(decideTests(qlfLB, p.value=0.01, adjust.method = "BH", lfc=1))
 
 #check the expression across all samples, not just my assigned ones
 which(rowData(brain)$gene_name == "UGT1A1") #gene found in liver cells
