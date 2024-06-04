@@ -6,6 +6,9 @@ library(recount3)
 library(edgeR)
 library(ggplot2)
 library(ggpubr)
+library(limma)
+library(ggrepel)
+library(openxlsx)
 
 #----Colors----
 #color pallete to use for figure generation throughout
@@ -161,6 +164,14 @@ colnames(x) <- c("Brain30", "Brain31","Brain33",
                  "Blood30", "Blood31","Blood32",
                  "Liver31","Liver32","Liver33")
 
+#removing genes with little/no annotation
+x <- x[!(row.names(x) %in%  row.names(x)[startsWith(row.names(x), "LOC")]), ]
+x <- x[!(row.names(x) %in%  row.names(x)[startsWith(row.names(x), "LINC")]), ]
+x <- x[!(row.names(x) %in%  row.names(x)[startsWith(row.names(x), "MIR")]), ]
+x <- x[!(row.names(x) %in%  row.names(x)[startsWith(row.names(x), "SNORD")]), ]
+x <- x[!(row.names(x) %in%  row.names(x)[startsWith(row.names(x), "RPL")]), ] 
+x <- x[!(row.names(x) %in%  row.names(x)[startsWith(row.names(x), "RPS")]), ]
+
 #----DGE Object----
 y <- DGEList(counts = x)
 #define how the replicates are grouped
@@ -262,23 +273,91 @@ design
 
 #visualize how samples cluster together
 logcpm <- cpm(y, log=TRUE)
-par(bg = "#F9FCF3", mfrow=c(1,4))
-plotMDS(logcpm, labels=group, 
-        col=c(rep(colorpallete[3],3), rep(colorpallete[4],3), rep(colorpallete[5],3)),
-        main="Tissue")
+par(bg = "#F9FCF3")
+mds <-plotMDS(logcpm)
+mdsgroup <- data.frame(Dim1 = mds$x, Dim2 = mds$y, Group = group)
+mdsgroupplot <- ggplot(mdsgroup, aes(Dim1, Dim2, colour = group))+ 
+  geom_point()+ 
+  geom_label_repel(aes(label = Group),
+                   box.padding   = 0.35, 
+                   point.padding = 0.5) +
+  scale_color_manual(values = c(colorpallete[2], colorpallete[7], colorpallete[8])) +
+  ylab("Leading logFC Dimension 2")+
+  xlab("Leading logFC Dimension 1")+
+  ggtitle("Tissue")+
+  theme(legend.position="none",
+        panel.border = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.background = element_rect(fill = "#F9FCF3"),
+        panel.background = element_rect(fill = "white"),
+        plot.title = element_text(hjust = 0.5, size = 18))
 #label the samples by rRNA
-plotMDS(logcpm, labels=y$samples$rRNA, 
-        col=c(rep(colorpallete[3],3), rep(colorpallete[4],3), rep(colorpallete[5],3)),
-        main="% rRNA")
+mdsrrna <- data.frame(Dim1 = mds$x, Dim2 = mds$y, Group = y$samples$rRNA)
+mdsrrnaplot <- ggplot(mdsrrna, aes(Dim1, Dim2, colour = group))+ 
+  geom_point()+ 
+  geom_label_repel(aes(label = Group),
+                   box.padding   = 0.35, 
+                   point.padding = 0.5) +
+  scale_color_manual(values = c(colorpallete[2], colorpallete[7], colorpallete[8])) +
+  ylab("Leading logFC Dimension 2")+
+  xlab("Leading logFC Dimension 1")+
+  ggtitle("% rRNA")+
+  theme(legend.position="none",
+        panel.border = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.background = element_rect(fill = "#F9FCF3"),
+        panel.background = element_rect(fill = "white"),
+        plot.title = element_text(hjust = 0.5, size = 18))
 #label by percent of mitochondrial reads
-plotMDS(logcpm, labels=y$samples$chrm, 
-        col=c(rep(colorpallete[3],3), rep(colorpallete[4],3), rep(colorpallete[5],3)),
-        main="% Mitochondrial Genes")
-#label by age
-plotMDS(logcpm, labels=y$samples$age, 
-        col=c(rep(colorpallete[3],3), rep(colorpallete[4],3), rep(colorpallete[5],3)),
-        main="Age")
-par(mfrow=c(1,1))
+mdschrm <- data.frame(Dim1 = mds$x, Dim2 = mds$y, Group = y$samples$chrm)
+mdschrmplot <- ggplot(mdschrm, aes(Dim1, Dim2, colour = group))+ 
+  geom_point()+ 
+  geom_label_repel(aes(label = Group),
+                   box.padding   = 0.35, 
+                   point.padding = 0.5) +
+  scale_color_manual(values = c(colorpallete[2], colorpallete[7], colorpallete[8])) +
+  ylab("Leading logFC Dimension 2")+
+  xlab("Leading logFC Dimension 1")+
+  ggtitle("% Mitochondrial Genes")+
+  theme(legend.position="none",
+        panel.border = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.background = element_rect(fill = "#F9FCF3"),
+        panel.background = element_rect(fill = "white"),
+        plot.title = element_text(hjust = 0.5, size = 18))
+#label by slice
+mdsslice <- data.frame(Dim1 = mds$x, Dim2 = mds$y, Group = y$samples$slice)
+mdssliceplot <- ggplot(mdsslice, aes(Dim1, Dim2, colour = group))+ 
+  geom_point()+ 
+  geom_label_repel(aes(label = Group),
+                   box.padding   = 0.35, 
+                   point.padding = 0.5) +
+  scale_color_manual(values = c(colorpallete[2], colorpallete[7], colorpallete[8])) +
+  ylab("Leading logFC Dimension 2")+
+  xlab("Leading logFC Dimension 1")+
+  ggtitle("Slice")+
+  theme(legend.position="none",
+        panel.border = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.background = element_rect(fill = "#F9FCF3"),
+        panel.background = element_rect(fill = "white"),
+        plot.title = element_text(hjust = 0.5, size = 18))
+
+ggarrange(mdsgroupplot, mdsrrnaplot, mdschrmplot, mdssliceplot,
+          ncol = 4, nrow = 1)
+
 #plot biological coefficient of variation
 y <- estimateDisp(y, design)
 plotBCV(y, col.common = colorpallete[9], col.trend = colorpallete[7], col.tagwise = colorpallete[6])
@@ -302,10 +381,22 @@ qlfB <- glmQLFTest(fit, contrast = c(-0.5,1,-0.5))
 
 qlfBBL
 
+#trim lists to exclude logcpm<0 (cpm<1)
+qlfBBL <- qlfBBL[which(qlfBBL$table$logCPM>=0),]
+qlfLBL <- qlfLBL[which(qlfLBL$table$logCPM>=0),]
+qlfLB <- qlfLB[which(qlfLB$table$logCPM>=0),]
+qlfBL <- qlfBL[which(qlfBL$table$logCPM>=0),]
+qlfL <- qlfL[which(qlfL$table$logCPM>=0),]
+qlfB <- qlfB[which(qlfB$table$logCPM>=0),]
+
 #DE genes, sorted by p-value, with the FDR added
 topTags(qlfBBL, n=10,adjust.method = "BH", sort.by = "PValue")
 topTags(qlfLBL, n=10,adjust.method = "BH", sort.by = "PValue")
 topTags(qlfLB, n=10,adjust.method = "BH", sort.by = "PValue")
+#1 v 2
+topTags(qlfB, n=10,adjust.method = "BH", sort.by = "PValue")
+topTags(qlfBL, n=10,adjust.method = "BH", sort.by = "PValue")
+topTags(qlfL, n=10,adjust.method = "BH", sort.by = "PValue")
 
 #get the whole table and write to a file
 resultsBBL <- topTags(qlfBBL, n = 10000000, adjust.method = "BH", sort.by = "PValue", p.value = 1)
@@ -314,17 +405,52 @@ resultsLB <- topTags(qlfLB, n = 10000000, adjust.method = "BH", sort.by = "PValu
 write.table(resultsBBL, "resultsBBL.txt")
 write.table(resultsLBL, "resultsLBL.txt")
 write.table(resultsLB, "resultsLB.txt")
+#1 v 2
+resultsB <- topTags(qlfB, n = 10000000, adjust.method = "BH", sort.by = "PValue", p.value = 1)
+resultsBL <- topTags(qlfBL, n = 10000000, adjust.method = "BH", sort.by = "PValue", p.value = 1)
+resultsL <- topTags(qlfL, n = 10000000, adjust.method = "BH", sort.by = "PValue", p.value = 1)
+write.table(resultsB, "resultsB.txt")
+write.table(resultsBL, "resultsBL.txt")
+write.table(resultsL, "resultsL.txt")
+write.xlsx(resultsB$table, "resultsB.xlsx", rowNames=T, colNames=T)
+write.xlsx(resultsBL$table, "resultsBL.xlsx", rowNames=T, colNames=T)
+write.xlsx(resultsL$table, "resultsL.xlsx", rowNames=T, colNames=T)
 
 #summary of DE genes
 summary(decideTests(qlfBBL, p.value=0.01, adjust.method = "BH", lfc=1)) #can adjust p value and log fold change
 summary(decideTests(qlfLBL, p.value=0.01, adjust.method = "BH", lfc=1))
 summary(decideTests(qlfLB, p.value=0.01, adjust.method = "BH", lfc=1))
+#summary 1 v 2
+summary(decideTests(qlfB, p.value=0.01, adjust.method = "BH", lfc=1)) #can adjust p value and log fold change
+summary(decideTests(qlfBL, p.value=0.01, adjust.method = "BH", lfc=1))
+summary(decideTests(qlfL, p.value=0.01, adjust.method = "BH", lfc=1))
+
 
 #check the expression across all samples, not just my assigned ones
 which(rowData(brain)$gene_name == "UGT1A1") #gene found in liver cells
-boxplot(assays(brain)$TPM[20205,],assays(blood)$TPM[20205,], assays(liver)$TPM[20205,], outline=F )
+# Make individual data frames
+a <- data.frame(group = "Brain", value = assays(brain)$TPM[32683,])
+b <- data.frame(group = "Blood", value = assays(blood)$TPM[32683,])
+c <- data.frame(group = "Liver", value = assays(liver)$TPM[32683,])
+
+# Combine into one long data frame
+plot.data <- rbind(a, b, c)
+
+ggplot(plot.data, aes(x=group, y=value, fill=group)) + 
+  geom_boxplot(alpha=0.3, notch=TRUE) +
+  scale_fill_manual(values = c(colorpallete[1], colorpallete[2], colorpallete[8]))+
+  ylab("Transcript per Million (TPM)")+
+  xlab("Tissue")+
+  ggtitle("TPM Levels for UGT1A1")+
+  theme(legend.position="none",
+        panel.grid.major.y = element_blank(),
+        panel.border = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.background = element_rect(fill = "#F9FCF3"),
+        panel.background = element_rect(fill = "white"),
+        plot.title = element_text(hjust = 0.5, size=18))
+
 #use a statistical test to prove this expression across all samples is significant
-wilcox.test(assays(brain)$TPM[20205,], assays(blood)$TPM[20205,], alternative='two.sided',exact = F,correct = T)
-wilcox.test(assays(brain)$TPM[20205,], assays(liver)$TPM[20205,], alternative='two.sided',exact = F,correct = T)
-wilcox.test(assays(blood)$TPM[20205,], assays(liver)$TPM[20205,], alternative='two.sided',exact = F,correct = T)
-#TODO: adjust so that the comparison is liver vs blood + brain
+wilcox.test(assays(liver)$TPM[32683,], append(assays(brain)$TPM[32683,],assays(blood)$TPM[32683,]), alternative='two.sided',exact = F)
